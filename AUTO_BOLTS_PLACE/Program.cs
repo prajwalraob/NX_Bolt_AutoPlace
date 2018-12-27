@@ -37,19 +37,41 @@ public class Program
     public static int Main(string[] args)
     {
         int retValue = 0;
+        double pi = 3.1428;
         try
         {
             theProgram = new Program();
+            System.IO.StreamWriter SW = new System.IO.StreamWriter("D:\\ACCEPTED_NX_MODELS\\NXDebugLog.log");
+            string PartPath = "D:\\ACCEPTED_NX_MODELS\\PIPES\\PIPE_ASM.prt";
 
-            //TODO: Add your application code here 
+            PartLoadStatus PLD;
+            //Part prt = theSession.Parts.OpenDisplay(PartPath, out PLD);
+            Part wp = theSession.Parts.Work;
+            Part prt = theSession.Parts.Display;
 
-            theProgram.Dispose();
+            NXOpen.Assemblies.ComponentAssembly Asm = prt.ComponentAssembly;
+            NXOpen.Assemblies.Component[] Col = Asm.RootComponent.GetChildren();
+
+            string addPart = "D:\\ACCEPTED_NX_MODELS\\PIPES\\BOLT_ASM.prt";
+            Point3d point;
+            point.X = 0; point.Y = -8; point.Z = 85 / 2;
+            Matrix3x3 matrix = default(Matrix3x3);
+            matrix.Xx = 1; matrix.Xy = 0; matrix.Xz = 0;
+            matrix.Yx = 0; matrix.Yy = 0; matrix.Yz = 1;
+            matrix.Zx = 0; matrix.Zy = -1; matrix.Zz = pi / 2;
+            Asm.AddComponent(addPart, "MDL", "BOLT", point, matrix, 254, out PLD);
+
+            SW.Close();
+            prt.Save(BasePart.SaveComponents.True, BasePart.CloseAfterSave.False);
+            PartCloseResponses PCL = default(PartCloseResponses);
+            //theSession.Parts.CloseAll(BasePart.CloseModified.DontCloseModified, PCL);
         }
         catch (NXOpen.NXException ex)
         {
-            // ---- Enter your exception handling code here -----
+
 
         }
+        theProgram.Dispose();
         return retValue;
     }
 
@@ -67,19 +89,50 @@ public class Program
     //------------------------------------------------------------------------------
     public static int Startup()
     {
+        double pi = 3.1428;
         int retValue = 0;
         try
         {
             theProgram = new Program();
+            System.IO.StreamWriter SW = new System.IO.StreamWriter("D:\\ACCEPTED_NX_MODELS\\NXDebugLog.log");
+            string PartPath = "D:\\ACCEPTED_NX_MODELS\\PIPES\\PIPE_ASM.prt";
 
-            //TODO: Add your application code here 
+            PartLoadStatus PLD;
+            Part prt = theSession.Parts.Open(PartPath, out PLD);
+            Part wp = theSession.Parts.Work;
+            Part dp = theSession.Parts.Display;
+
+            NXOpen.Assemblies.ComponentAssembly Asm = prt.ComponentAssembly;
+            NXOpen.Assemblies.Component[] Col = Asm.RootComponent.GetChildren();
+
+            string addPart = "D:\\ACCEPTED_NX_MODELS\\PIPES\\BOLT_ASM.prt";
+            Point3d point;
+            point.X = 0; point.Y = 0; point.Z = 0;
+            Matrix3x3 matrix = default(Matrix3x3);
+            matrix.Xx = pi / 4; matrix.Xy = 1; matrix.Xz = 0;
+            matrix.Yx = -1; matrix.Yy = 0; matrix.Yz = 0;
+            matrix.Zx = 0; matrix.Zy = 0; matrix.Zz = 0;
+            Asm.AddComponent(addPart, "MDL", "BOLT", point, matrix, 254, out PLD);
+
+            SW.Close();
+            prt.Save(BasePart.SaveComponents.True, BasePart.CloseAfterSave.True);
+            PartCloseResponses PCL = default(PartCloseResponses);
+            //theSession.Parts.CloseAll(BasePart.CloseModified.DontCloseModified, PCL);
 
         }
         catch (NXOpen.NXException ex)
         {
-            // ---- Enter your exception handling code here -----
-            // theUI.NXMessageBox.Show("UI Styler", NXMessageBox.DialogType.Error, ex.Message);
+            System.IO.StreamWriter SW = new System.IO.StreamWriter("D:\\ACCEPTED_NX_MODELS\\NXErrorLog.log");
+            SW.WriteLine(ex.Message.ToString());
+            SW.Close();
+
+            theUfSession.Part.CloseAll();
+
+            theSession.ListingWindow.Open();
+            theSession.ListingWindow.WriteLine("Error occurred");
+            theSession.ListingWindow.WriteLine(ex.Message.ToString());
         }
+        //theProgram.Dispose();
         return retValue;
     }
 
