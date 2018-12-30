@@ -1,5 +1,9 @@
 using System;
+using System.IO;
+using System.Collections.Generic;
+
 using NXOpen;
+using NXOpen.Assemblies;
 using NXOpen.UF;
 
 public class Program
@@ -10,6 +14,7 @@ public class Program
     private static UFSession theUfSession;
     public static Program theProgram;
     public static bool isDisposeCalled;
+	double pi = 3.1428;
 
     //------------------------------------------------------------------------------
     // Constructor
@@ -37,33 +42,10 @@ public class Program
     public static int Main(string[] args)
     {
         int retValue = 0;
-        double pi = 3.1428;
         try
         {
             theProgram = new Program();
-            System.IO.StreamWriter SW = new System.IO.StreamWriter("D:\\ACCEPTED_NX_MODELS\\NXDebugLog.log");
-            string PartPath = "D:\\ACCEPTED_NX_MODELS\\PIPES\\PIPE_ASM.prt";
 
-            PartLoadStatus PLD;
-            //Part prt = theSession.Parts.OpenDisplay(PartPath, out PLD);
-            Part wp = theSession.Parts.Work;
-            Part prt = theSession.Parts.Display;
-
-            NXOpen.Assemblies.ComponentAssembly Asm = prt.ComponentAssembly;
-            NXOpen.Assemblies.Component[] Col = Asm.RootComponent.GetChildren();
-
-            string addPart = "D:\\ACCEPTED_NX_MODELS\\PIPES\\BOLT_ASM.prt";
-            Point3d point;
-            point.X = 0; point.Y = -8; point.Z = 85 / 2;
-            Matrix3x3 matrix = default(Matrix3x3);
-            matrix.Xx = 1; matrix.Xy = 0; matrix.Xz = 0;
-            matrix.Yx = 0; matrix.Yy = 0; matrix.Yz = 1;
-            matrix.Zx = 0; matrix.Zy = -1; matrix.Zz = pi / 2;
-            Asm.AddComponent(addPart, "MDL", "BOLT", point, matrix, 254, out PLD);
-
-            SW.Close();
-            prt.Save(BasePart.SaveComponents.True, BasePart.CloseAfterSave.False);
-            PartCloseResponses PCL = default(PartCloseResponses);
             //theSession.Parts.CloseAll(BasePart.CloseModified.DontCloseModified, PCL);
         }
         catch (NXOpen.NXException ex)
@@ -93,36 +75,26 @@ public class Program
         int retValue = 0;
         try
         {
-            theProgram = new Program();
-            System.IO.StreamWriter SW = new System.IO.StreamWriter("D:\\ACCEPTED_NX_MODELS\\NXDebugLog.log");
-            string PartPath = "D:\\ACCEPTED_NX_MODELS\\PIPES\\PIPE_ASM.prt";
+			/*
+                Before starting implementation, check how to start the assembly with full part load option;
+            currently the load options only enabled for partial loading. See how to set it permanently or
+            for session start with API.
 
-            PartLoadStatus PLD;
-            Part prt = theSession.Parts.Open(PartPath, out PLD);
-            Part wp = theSession.Parts.Work;
-            Part dp = theSession.Parts.Display;
+                First part of the trial task is to load and change the parameter of the bolt.
+            For test change clamping distance. (27/12)
+            */
+            theProgram = new Program();        
+			System.IO.StreamWriter SW = new System.IO.StreamWriter("D:\\GIT\\AUTO_BOLTS_PLACE\\NXDebugLog.log");
 
-            NXOpen.Assemblies.ComponentAssembly Asm = prt.ComponentAssembly;
-            NXOpen.Assemblies.Component[] Col = Asm.RootComponent.GetChildren();
-
-            string addPart = "D:\\ACCEPTED_NX_MODELS\\PIPES\\BOLT_ASM.prt";
-            Point3d point;
-            point.X = 0; point.Y = 0; point.Z = 0;
-            Matrix3x3 matrix = default(Matrix3x3);
-            matrix.Xx = pi / 4; matrix.Xy = 1; matrix.Xz = 0;
-            matrix.Yx = -1; matrix.Yy = 0; matrix.Yz = 0;
-            matrix.Zx = 0; matrix.Zy = 0; matrix.Zz = 0;
-            Asm.AddComponent(addPart, "MDL", "BOLT", point, matrix, 254, out PLD);
-
+            theProgram.LoadAssmbly();
+ 
+            theUfSession.Part.CloseAll();
             SW.Close();
-            prt.Save(BasePart.SaveComponents.True, BasePart.CloseAfterSave.True);
-            PartCloseResponses PCL = default(PartCloseResponses);
-            //theSession.Parts.CloseAll(BasePart.CloseModified.DontCloseModified, PCL);
-
+            theProgram.Dispose();
         }
         catch (NXOpen.NXException ex)
         {
-            System.IO.StreamWriter SW = new System.IO.StreamWriter("D:\\ACCEPTED_NX_MODELS\\NXErrorLog.log");
+            System.IO.StreamWriter SW = new System.IO.StreamWriter("D:\\GIT\\AUTO_BOLTS_PLACE\\NXErrorLog.log");
             SW.WriteLine(ex.Message.ToString());
             SW.Close();
 
@@ -166,6 +138,114 @@ public class Program
 
         //Unloads the image when the NX session terminates
         return System.Convert.ToInt32(Session.LibraryUnloadOption.AtTermination);
+    }
+	
+	    private Dictionary<string, string> Dirs(string SourcePath, string Target)
+    {
+        string specification = "M20x35";
+        Dictionary<string, string> NewDict = new Dictionary<string, string>();
+
+        foreach (string dirPath in Directory.GetFiles(SourcePath, "*", SearchOption.AllDirectories))
+        {
+            string temp = System.IO.Path.GetFileNameWithoutExtension(dirPath);
+            string ext = System.IO.Path.GetExtension(dirPath);
+            temp = temp + "_" + specification + ext;
+
+            string boltpath = "BOLT_" + specification;
+
+            string newdir = System.IO.Path.Combine(Target, boltpath);
+            string final = System.IO.Path.Combine(newdir, temp);
+
+            if (!(Directory.Exists(newdir)))
+            {
+                Directory.CreateDirectory(System.IO.Path.Combine(SourcePath, boltpath));
+            }
+
+            File.Copy(dirPath, final, true);
+
+            string partanme = Path.GetFileNameWithoutExtension(final);
+
+            try
+            {
+                if (partanme.Contains("BOLT"))
+                {
+                    NewDict.Add("BOLT", final);
+                }
+
+                if (partanme.Contains("NUT"))
+                {
+                    NewDict.Add("NUT", final);
+                }
+
+                if (partanme.Contains("ASSEMBLY"))
+                {
+                    NewDict.Add("ASM", final);
+                }
+
+                if (partanme.Contains("WASHER"))
+                {
+                    NewDict.Add("WSH", final);
+                }
+            }
+            catch (Exception E)
+            {
+            }
+        }
+
+        return NewDict;
+    }
+
+    private void LoadAssmbly()
+    {
+        string PartPath = "D:\\ACCEPTED_NX_MODELS\\NUT_BOLT\\MASTERS";
+        string TargetFolder = "D:\\ACCEPTED_NX_MODELS\\PIPES";
+
+        Dictionary<string, string> NS = theProgram.Dirs(PartPath, TargetFolder);
+
+        string Asms = NS["ASM"];
+
+        theSession.Parts.LoadOptions.UsePartialLoading = false;
+
+        //https://community.plm.automation.siemens.com/t5/NX-Programming-Customization-Forum/How-to-fully-load-a-part-using-NXOpen/td-p/338330
+
+        PartLoadStatus PLD;
+        BasePart Asm = theSession.Parts.OpenDisplay(Asms, out PLD);
+
+        PlaceDefaultPos(Asm, NS["NUT"]);
+        PlaceDefaultPos(Asm, NS["BOLT"]);
+        PlaceDefaultPos(Asm, NS["WSH"]);
+        PlaceDefaultPos(Asm, NS["WSH"]);
+
+        PartSaveStatus PS;
+        bool Partsmod;
+        theSession.Parts.SaveAll(out Partsmod, out PS);
+
+        Component Comp = Asm.ComponentAssembly.RootComponent;
+
+        foreach (Component C in Comp.GetChildren())
+        {
+            BasePart T = C.OwningPart;
+            T.LoadFully();
+
+        }
+    }
+
+    void PlaceDefaultPos(BasePart baseprt ,string partpath)
+    {
+
+        Point3d basePoint = new NXOpen.Point3d(0.0, 0.0, 0.0);
+        Matrix3x3 orientation = new NXOpen.Matrix3x3();
+
+        orientation.Xx = 0; orientation.Xy = 0.0; orientation.Xz = -1;
+        orientation.Yx = 0.0; orientation.Yy = 1; orientation.Yz = 0;
+        orientation.Zx = 1; orientation.Zy = 0; orientation.Zz = 0;
+
+        string partname = Path.GetFileNameWithoutExtension(partpath);
+
+        PartLoadStatus partLoadStatus1;
+        Component component1;
+        component1 = baseprt.ComponentAssembly.AddComponent(partpath, "MODEL", partname, basePoint, orientation, -1, out partLoadStatus1, true);
+
     }
 
 }
